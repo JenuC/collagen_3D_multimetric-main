@@ -192,9 +192,10 @@ def collapse_identical_columns(df, groups):
 
 ##main
 
+# for timeseries - generating one csv for each time point 
+# since easier to iterate through or just select timepoint without large files
 
-
-dfCA = load_csv("G:/FluorescentCollagen/20260427_flucol_ows3/flucol_crops/ctFIREout/results_test_masked_min30/ctfire_stats_per_slice.csv")
+dfCA = load_csv("G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\ctFIREout\\results_masked_min30\\ctfire_stats_per_slice.csv")
 dfCAreorg = reshape_CA(dfCA)
 dfTWOMBLI = load_csv("C:/Users/hwilson23/Desktop/TWOMBLI-master/TWOMBLI_v1/Twombli_Results_concentration_shgandflu.csv")
 dfTWOMBLI = twombli_slice_data(dfTWOMBLI)
