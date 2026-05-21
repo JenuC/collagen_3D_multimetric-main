@@ -135,8 +135,12 @@ def extract_stack_key(filename):
 
 def twombli_slice_data(df):
     df['image_name'] = df['image_name'].apply(extract_stack_key)
-    df['slice'] = df['image_name'].str.extract(r'_s(\d{4})\.png$').astype(int)
-    df['timepoint'] = df['image_name'].str.extract(r'_t(\d{4})\.png$').astype(int)
+    # Remove only the leading zeros after _s, whether or not .png is still present
+    df['image_name'] = df['image_name'].str.replace(r'(_s)0+(\d+)(?:\.png)?$', r'\1\2', regex=True)
+
+    df['slice'] = df['image_name'].str.extract(r'_s0*(\d+)(?:\.png)?$')[0].astype(int)
+    df['timepoint'] = df['image_name'].str.extract(r'_t0*(\d+)')[0].astype(int)
+    df['position'] = df['image_name'].str.extract(r'Pos(\d+)')[0].astype(int)
     print('TWOMBLI spreadsheet processed')
     return df
 
@@ -235,14 +239,19 @@ else:
     print("No exactly identical columns found.")
 
 
+if any(col.startswith("n_") for col in collapseddf.columns):
+    collapseddf = collapseddf.rename(columns={col: col.replace(col, "fibercount") for col in collapseddf.columns if col.startswith("n")})
+if any(col.startswith("z_depth_") for col in collapseddf.columns):
+    collapseddf = collapseddf.rename(columns={col: col.replace(col, "z_depth") for col in collapseddf.columns if col.startswith("z_depth")})
+
 # Split into FLU and SHG dataframes if any type-like column exists
-unique_times = collapseddf['timepoints'].dropna().unique()
-for time in unique_times:
-    time_df = collapseddf[collapseddf['timepoints'] == time]
+unique_pos = collapseddf['position'].dropna().unique()
+for pos in unique_pos:
+    pos_df = collapseddf[collapseddf['position'] == pos]
     
-    time_df.to_csv(f"final_dataframe_byslice_timepoint_{time}.csv", index=False)
+    pos_df.to_csv(f"final_dataframe_byslice_pos_{pos}.csv", index=False)
     
-    print("Saved timepoint dataframes separately")
+    print("Saved position dataframes separately")
 
 # Also save the combined dataframe
 collapseddf.to_csv("finalcollapsed_dataframe_byslice.csv", index=False)
