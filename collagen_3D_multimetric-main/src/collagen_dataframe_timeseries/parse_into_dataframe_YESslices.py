@@ -127,15 +127,16 @@ def process_img_folder(folder, is_3d):
     return pd.DataFrame(stats)
 
 def extract_stack_key(filename):
-    idx = os.path.basename(filename).find("ome")
+    idx = os.path.basename(filename).find("png")
     #name of stack here will be used to collapse slices
     if idx != -1:
-        return os.path.basename(filename)[:idx + len("ome")]
+        return os.path.basename(filename)[:idx + len("png")]
     return None
 
 def twombli_slice_data(df):
-    df['slice'] = df['slice'] +1 ###corrected bc spreadsheet counts from 0
     df['image_name'] = df['image_name'].apply(extract_stack_key)
+    df['slice'] = df['image_name'].str.extract(r'_s(\d{4})\.png$').astype(int)
+    df['timepoint'] = df['image_name'].str.extract(r'_t(\d{4})\.png$').astype(int)
     print('TWOMBLI spreadsheet processed')
     return df
 
@@ -197,27 +198,26 @@ def collapse_identical_columns(df, groups):
 
 dfCA = load_csv("G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\ctFIREout\\results_masked_min30\\ctfire_stats_per_slice.csv")
 dfCAreorg = reshape_CA(dfCA)
-dfTWOMBLI = load_csv("C:/Users/hwilson23/Desktop/TWOMBLI-master/TWOMBLI_v1/Twombli_Results_concentration_shgandflu.csv")
+dfTWOMBLI = load_csv(r"C:\Users\hwilson23\Desktop\TWOMBLI-master\TWOMBLI_v1\Twombli_Results_kpcclusterdata2pos_20250518.csv")
 dfTWOMBLI = twombli_slice_data(dfTWOMBLI)
 #print(dfTWOMBLI)
 
-dftexture = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/20260427_texturemapdata/texturemap",is_3d = 0)
-dftexture= reshape_texture(dftexture)
+#dftexture = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/20260427_texturemapdata/texturemap",is_3d = 0)
+#dftexture= reshape_texture(dftexture)
 
-dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab",is_3d = 1)
-#dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab_n2", is_3d= 1)
-dftexture3D = reshape_texture(dftexture3D)
+#dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab",is_3d = 1)
+#dftexture3D = reshape_texture(dftexture3D)
 
 
 print(dfCAreorg["image_name"].nunique(), len(dfCAreorg))
 print(dfTWOMBLI["image_name"].nunique(), len(dfTWOMBLI))
-print(dftexture["image_name"].nunique(), len(dftexture))
-print(dftexture3D["image_name"].nunique(), len(dftexture3D))
+#print(dftexture["image_name"].nunique(), len(dftexture))
+#print(dftexture3D["image_name"].nunique(), len(dftexture3D))
 
 csvdf = pd.merge(dfCAreorg, dfTWOMBLI, on=["image_name","slice"], how="left")
-
-mostdf = pd.merge(csvdf, dftexture, on=["image_name","slice"], how="left")
-fulldf = pd.merge(mostdf,dftexture3D, on=["image_name","slice"], how = "left")
+fulldf = csvdf
+#mostdf = pd.merge(csvdf, dftexture, on=["image_name","slice"], how="left")
+#fulldf = pd.merge(mostdf,dftexture3D, on=["image_name","slice"], how = "left")
 
 
 print(fulldf.head())
@@ -236,24 +236,13 @@ else:
 
 
 # Split into FLU and SHG dataframes if any type-like column exists
-type_columns = [col for col in collapseddf.columns if col.startswith('type')]
-if type_columns:
-    type_col = type_columns[0]
-    collapseddf_flu = collapseddf[collapseddf[type_col].str.lower() == 'flu'].copy()
-    collapseddf_shg = collapseddf[collapseddf[type_col].str.lower() == 'shg'].copy()
+unique_times = collapseddf['timepoints'].dropna().unique()
+for time in unique_times:
+    time_df = collapseddf[collapseddf['timepoints'] == time]
     
-    # remove the _flu_ _shg_ part of the filename
-    collapseddf_flu['short_image_name'] = collapseddf_flu['image_name'].str.replace('_flu_', '_', regex=False)
-    collapseddf_shg['short_image_name'] = collapseddf_shg['image_name'].str.replace('_shg_', '_', regex=False)
-    print(f"Using type column: {type_col}")
-    print(f"FLU dataframe shape: {collapseddf_flu.shape}")
-    print(f"SHG dataframe shape: {collapseddf_shg.shape}")
+    time_df.to_csv(f"final_dataframe_byslice_timepoint_{time}.csv", index=False)
     
-    # Save separate files
-    collapseddf_flu.to_csv("final_dataframe_byslice_FLU.csv", index=False)
-    collapseddf_shg.to_csv("final_dataframe_byslice_SHG.csv", index=False)
-    
-    print("Saved FLU and SHG dataframes separately")
+    print("Saved timepoint dataframes separately")
 
 # Also save the combined dataframe
 collapseddf.to_csv("finalcollapsed_dataframe_byslice.csv", index=False)

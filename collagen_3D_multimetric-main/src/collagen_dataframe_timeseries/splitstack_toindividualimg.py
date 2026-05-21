@@ -28,7 +28,7 @@ for fname in os.listdir(input_dir):
 
         slice_img = stack[s]
 
-        out_name = f"{base[:-4]}_s{s+1:04d}.tif"
+        out_name = f"{base[:-4]}_s{s+1}.tif"
 
         out_path = os.path.join(output_dir, out_name)
 
