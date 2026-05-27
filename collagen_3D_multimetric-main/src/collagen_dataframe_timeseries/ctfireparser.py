@@ -305,9 +305,9 @@ def build_overlay_zstacks(ol_files, stacks, output_dir):
 def main():
     
     args = SimpleNamespace(
-        input_dir  = "G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\ctFIREout",
-        output_dir = "G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\ctFIREout\\results_masked_min30",
-        stacks     = ["kpclusters"],
+        input_dir  = "G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\A1A2endpointmaskapplied\\ctFIREout",
+        output_dir = "G:\\FluorescentCollagen\\20260519_flucol_kpc_ows3\\selectedpos\\A1A2endpointmaskapplied\\ctFIREout\\results_test_masked_min30",
+        stacks     = ["Pos0","Pos5"],
         z_step     = 2.0,
         no_overlay = False,
     )
