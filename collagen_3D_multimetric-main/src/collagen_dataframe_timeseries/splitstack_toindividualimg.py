@@ -2,8 +2,8 @@ import os
 import tifffile
 
 
-input_dir = r"G:\FluorescentCollagen\20260519_flucol_kpc_ows3\selectedpos\maskapplied_timeseries_stacks"
-output_dir = r"G:\FluorescentCollagen\20260519_flucol_kpc_ows3\selectedpos\maskapplied_timeseries_individualslices"
+input_dir = r"G:\FluorescentCollagen\20260519_flucol_kpc_ows3\selectedpos\A1A2endpointmaskapplied"
+output_dir = r"G:\FluorescentCollagen\20260519_flucol_kpc_ows3\selectedpos\A1A2endpointmaskapplied\maskapplied_individualimgs"
 
 os.makedirs(output_dir, exist_ok=True)
 
