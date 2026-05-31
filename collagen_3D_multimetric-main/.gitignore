@@ -1,4 +1,6 @@
-final_dataframe_byslice.csv
-final_dataframe.csv
+final_dataframe_*.csv
+current*.csv
+final*.csv
+temp*.csv
 glcm3D_attempt.asv
 
