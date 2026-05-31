@@ -1,114 +1,142 @@
 # Project Cleanup Plan & Checklist
 
-This document tracks the work needed to turn this research codebase into a clean, reproducible project that anyone on the team can run without manual path edits.
+This document tracks work to make this codebase reproducible and portable. Do one step at a time so each change is independently reversible.
 
 ---
 
-## Priority 1 — Make it Runnable by Anyone
+## Step 1 — Unified Config ✅ DONE
 
-These block reproducibility entirely.
+All hardcoded paths replaced. Single source of truth lives in `config.json` at the project root.
 
-- [ ] **Replace hardcoded input/output paths in all Python scripts**
-  - `parse_into_dataframe_YESslices.py` — CurveAlign folder, TWOMBLI CSV, texture folders, output folder
-  - `parse_into_dataframe_NOslices.py` — same paths
-  - `ctfireparser.py` — input folder, output folder
-  - `ctfire_statssummary.py` — input CSV path
-  - `RF_regression.py` — dataframe CSV path
-  - `RF_classifier.py` — dataframe CSV path
-  - Strategy: add a `config.py` or use `argparse` / `pathlib` relative paths from a project root variable
+- `config.json` — edit here for a new machine or experiment
+- `config.py` — thin Python wrapper; exposes `PATHS`, `EXTERNAL`, `PARAMS`
+- `src/calculate_glcm3D/glcm_config.m` — thin MATLAB wrapper; exposes `CFG` struct
 
-- [ ] **Replace hardcoded paths in MATLAB scripts**
-  - `glcm3D_attempt.m` — `folder`, `outpath`
-  - `glcm3D_attempt_gpu.m` — same (also references `C:\Users\hwilson23\...`)
-  - Strategy: accept folder arguments at the top of each script, or use a separate `config.m`
+Python scripts modified: `applyareamask.py`, `splitstack_toindividualimg.py`, `ctfireparser.py`, `parse_into_dataframe_YESslices.py`, `parse_into_dataframe_NOslices.py`
 
-- [ ] **Fix the double-nested directory structure**
-  - The repo root has `collagen_3D_multimetric-main/collagen_3D_multimetric-main/` — the inner folder is the actual project
-  - Either flatten (move `src/`, `data/`, `docs/`, `pyproject.toml` to root) or remove the outer wrapper folder
-
-- [ ] **Move CSV/XLSX output files to `data/` only**
-  - Currently `final_dataframe_byslice_FLU_n2.csv`, `final_dataframe_byslice_SHG_n2.csv`, `finalcollapsed_dataframe_byslice_n2.csv` exist in the repo root AND in `data/` (with slightly different names)
-  - Remove the root-level duplicates; standardize on one location and one naming convention
+MATLAB scripts modified: `glcm3D_attempt.m`, `GLCM_TOP_attempt.m`, `glcm3D_attempt_withquadrants.m`, `glcm3D_attempt_gpu.m`
 
 ---
 
-## Priority 2 — Code Quality
+## Step 2 — Add `if __name__ == "__main__"` Guards
 
-These make the code more reliable and easier to modify.
+**Why:** Several scripts execute immediately on import because all their logic sits at the top level. This means you can't import helper functions from them without triggering a full pipeline run, and it makes testing individual functions impossible.
 
-- [ ] **Remove temporary files from `data/`**
-  - Delete `final_dataframe_byslice_FLU_temp.xlsx` and `final_dataframe_byslice_FLU_temp_stride5.xlsx`
-  - Add `data/*.xlsx` and `data/*_temp*` to `.gitignore` to prevent future commits of scratch files
+**Scripts to fix:**
 
-- [ ] **Add `.gitignore`**
-  - Ignore: `*.xlsx`, `*.mat`, `__pycache__/`, `.ipynb_checkpoints/`, `*.pyc`, large generated TIF outputs
+- [ ] `splitstack_toindividualimg.py` — wrap body in `def main(): ...` + guard
+- [ ] `parse_into_dataframe_YESslices.py` — wrap `## main` section
+- [ ] `parse_into_dataframe_NOslices.py` — wrap `## main` section
+- [ ] `ctfireparser.py` — already has a `SimpleNamespace`-based args block; wrap it
 
-- [ ] **Make column dropping in ML scripts data-driven**
-  - `RF_regression.py` and `RF_classifier.py` drop columns by hardcoded name list
-  - Replace with: drop non-numeric columns, or columns matching a pattern, so renames upstream don't silently break the model
+**Pattern to use in each:**
 
-- [ ] **Standardize output file naming**
-  - The `_n2` suffix on the root-level CSVs vs. no suffix in `data/` is confusing
-  - Decide on one convention and document it (e.g., version suffix only when a dataset is frozen for a paper figure)
+```python
+def main():
+    # existing top-level code goes here
 
-- [ ] **Add docstrings to the main functions in Python scripts**
-  - Priority: `reshape_CA()`, `twombli_slice_data()`, `process_img_folder()`, `find_identical_columns()`, `collapse_identical_columns()`
-  - One-line description + parameter list is sufficient
+if __name__ == "__main__":
+    main()
+```
 
 ---
 
-## Priority 3 — Project Structure
+## Step 3 — `.gitignore` Cleanup
 
-These improve navigability without changing behavior.
+**Why:** Without this, MATLAB cache files, Python bytecode, and generated outputs can accidentally get committed and bloat the repo.
 
-- [ ] **Add a top-level `README.md` that links to `docs/`**
-  - The current `README.md` at the project root mixes the Python pipeline and GLCM documentation in one flat file
-  - Rewrite as a short project intro that links to `docs/OVERVIEW.md` and the subproject docs
+- [ ] Add `.gitignore` at project root with:
 
-- [ ] **Add a `scripts/` or top-level entry points**
-  - Create a single `run_pipeline.py` (or shell script) that calls the parse and ML scripts in order with sample paths
-  - This gives a newcomer one command to run to reproduce results
+  ```gitignore
+  # Python
+  __pycache__/
+  *.pyc
+  .ipynb_checkpoints/
+  .venv/
 
-- [ ] **Consolidate `parse_into_dataframe_YESslices.py` and `NOslices.py`**
-  - The two files share >80% of their code
-  - Refactor into one script with a `--per-slice` / `--per-stack` flag, or a shared `pipeline.py` module with a `main()` that both call
+  # MATLAB
+  *.mat
+  *.asv
 
-- [ ] **Move notebook to a dedicated `notebooks/` folder**
-  - `analyze_dataframe.ipynb` currently lives in `src/collagen_dataframe/`
-  - Notebooks are not source code — move to `notebooks/` at project root level
+  # Generated outputs
+  data/*.xlsx
+  data/*_temp*
+  data/*_stride*
+  output/
 
----
+  # OS
+  .DS_Store
+  Thumbs.db
+  ```
 
-## Priority 4 — Reproducibility & Environment
-
-- [ ] **Add a `README` section on how to run**
-  - Required software versions (MATLAB version, Python version)
-  - Step-by-step: install dependencies → run GLCM MATLAB → run Python pipeline → run ML scripts
-  - How to point scripts at your own data
-
-- [ ] **Pin MATLAB toolbox versions in documentation**
-  - Note which MATLAB release was tested (R20XXa/b)
-
-- [ ] **Add a sample/test dataset or point to one**
-  - The `ground_truth_data/` spiral TIFs are perfect for a smoke test
-  - Document: "run the pipeline on these files to verify your installation"
-
-- [ ] **Consider adding a `Makefile` or `justfile` for common tasks**
-  - `make pipeline` → runs parse scripts
-  - `make ml` → runs RF scripts
-  - `make clean` → removes generated CSVs and plots
+- [ ] Remove root-level duplicate CSVs (`*_n2.csv` files) — keep only the copies in `data/`
+- [ ] Remove temp files: `data/*_temp*.xlsx`, `data/*_stride5*`
 
 ---
 
-## Summary of File Changes
+## Step 4 — Restructure `src/` to Match Pipeline Steps
 
-| Action | Files |
-|---|---|
-| Delete duplicates | Root-level `*_n2.csv` files (keep `data/` copies) |
-| Delete temp files | `data/*_temp*.xlsx`, `data/*_stride5*` |
-| Add | `.gitignore` |
-| Add | `config.py` (or `argparse` in each script) |
-| Add | `scripts/run_pipeline.py` |
-| Move | `analyze_dataframe.ipynb` → `notebooks/` |
-| Rewrite | Root `README.md` (shorter, link to docs) |
-| Refactor | `parse_into_dataframe_YESslices.py` + `NOslices.py` → shared module |
+**Why:** The current folder names (`collagen_dataframe_timeseries/`, `collagen_dataframe/`) don't map to the pipeline steps described in `working-pipeline.md`. A newcomer can't tell which folder to look in.
+
+**Proposed rename:**
+
+```text
+src/
+  calculate_glcm3D/              → step3_glcm3d/
+  collagen_dataframe_timeseries/ → split across:
+      step1_preprocess/          (splitstack_toindividualimg.py)
+      step2_masking/             (applyareamask.py)
+      step4_fiber_analysis/      (ctfireparser.py, ctfire_statssummary.py)
+      step7_aggregation/         (parse_into_dataframe_YESslices.py, _NOslices.py)
+  collagen_dataframe/            → step7_aggregation/  (RF_regression.py, RF_classifier.py, notebook)
+  ground_truth_data/             → keep name (it's self-explanatory)
+```
+
+**Steps to execute this safely:**
+
+1. Create the new folders under `src/`
+2. Move files one folder at a time (start with `step1_preprocess/` — only one file)
+3. Update `sys.path.insert(0, str(Path(__file__).parents[N]))` in each moved script — the parent count may change if nesting depth changes
+4. Test each moved script runs before moving the next folder
+5. Delete the old empty folders last
+
+**Note on `sys.path` depth:** Scripts currently two levels below project root (`src/collagen_dataframe_timeseries/`) use `.parents[2]`. After the rename the depth stays the same (`src/step1_preprocess/`), so no path changes needed for those. Verify before and after.
+
+---
+
+## Step 5 — Add `argparse` CLI to Server Scripts
+
+**Why:** `ctfireparser.py` and the GLCM scripts are meant to run on a server or compute cluster. Hardwired args (currently via `SimpleNamespace`) can't be overridden without editing the file.
+
+- [ ] `ctfireparser.py` — replace `SimpleNamespace` block with `argparse`:
+
+  ```python
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--input-dir",  default=str(PATHS["ctfire_out"]))
+  parser.add_argument("--output-dir", default=str(PATHS["ctfire_results"]))
+  parser.add_argument("--z-step",     type=float, default=PARAMS["z_step"])
+  parser.add_argument("--stacks",     nargs="+",  default=PARAMS["stacks"])
+  args = parser.parse_args()
+  ```
+
+  Config values become defaults; command-line overrides them when needed.
+
+- [ ] Consider the same treatment for `parse_into_dataframe_YESslices.py` if it ever runs non-interactively
+
+---
+
+## Remaining Low-Priority Items
+
+These improve quality but don't block portability.
+
+- [ ] **Fix double-nested directory** — `collagen_3D_multimetric-main/collagen_3D_multimetric-main/` — the outer wrapper folder is an artifact of downloading a GitHub zip. Either flatten or document that the inner folder is the actual project root.
+
+- [ ] **Consolidate the two parse scripts** — `parse_into_dataframe_YESslices.py` and `NOslices.py` share >80% of their code. Refactor into one script with a `--per-slice` flag, or extract shared functions into a `pipeline_utils.py` module.
+
+- [ ] **Make ML column-dropping data-driven** — `RF_regression.py` and `RF_classifier.py` drop columns by hardcoded name list. Replace with: drop non-numeric columns or columns matching a pattern, so upstream renames don't silently break the model.
+
+- [ ] **Move notebook** — `analyze_dataframe.ipynb` (currently in `src/collagen_dataframe/`) belongs in a top-level `notebooks/` folder — notebooks are not source code.
+
+- [ ] **Pin tested environment** — note the MATLAB release version (R20XXa/b) and Python version (≥3.13) used, and add it to `docs/OVERVIEW.md`.
+
+- [ ] **Smoke test with spiral data** — document that running the pipeline on `ground_truth_data/` spiral TIFs verifies a new installation.
